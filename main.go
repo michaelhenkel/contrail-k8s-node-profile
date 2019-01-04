@@ -31,10 +31,7 @@ func main(){
 
 func createConfig() error{
         return retry(10, time.Second, func() error {
-          hostname, err := os.Hostname()
-	  if err != nil {
-		panic(err.Error())
-	  }
+          hostname := os.Getenv("MY_POD_NAME")
           nameSpaceByte, err := ioutil.ReadFile("/run/secrets/kubernetes.io/serviceaccount/namespace")
 	  if err != nil {
 		panic(err.Error())
