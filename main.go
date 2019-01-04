@@ -12,6 +12,7 @@ package main
 
 import (
         "time"
+        "strings"
 	"fmt"
         "os"
         "io/ioutil"
@@ -58,21 +59,23 @@ func createConfig() error{
           if err != nil {
             return err
           }
-          var nodeProfile string
+          var nodeProfileList []string
           for labelKey, labelValue := range currentNode.Labels{
-              if labelKey == "opencontrail.org/profile"{
-                  nodeProfile = labelValue
+              lk := strings.Split(labelKey, "_")
+              if lk[0] == "opencontrail.org/profile"{
+                  nodeProfileList = append(nodeProfileList, labelValue)
               }
           }
-          if nodeProfile != "" {
+          if len(nodeProfileList) > 0 {
               configMapClient := clientset.CoreV1().ConfigMaps(nameSpace)
-              profileCm, err := configMapClient.Get(nodeProfile, metav1.GetOptions{})
-              if err != nil {
-                return err
-              }
-              if len(profileCm.Data) > 0 {
-                  for key, value := range(profileCm.Data){
-                      fmt.Printf("%s=%s\n", key, value)
+              for _, profile := range(nodeProfileList){
+                  profileCm, err := configMapClient.Get(profile, metav1.GetOptions{})
+                  if err == nil {
+                      if len(profileCm.Data) > 0 {
+                          for key, value := range(profileCm.Data){
+                            fmt.Printf("%s=%s\n",key,value)
+                          }
+                      }
                   }
               }
           }
