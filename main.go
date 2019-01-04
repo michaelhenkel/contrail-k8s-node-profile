@@ -14,6 +14,7 @@ import (
         "time"
 	"fmt"
 	"net"
+        "os"
 	"strings"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -32,6 +33,12 @@ func main(){
 
 func createConfig() error{
         return retry(10, time.Second, func() error {
+          hostname, err := os.Hostname()
+	  if err != nil {
+		panic(err.Error())
+	  }
+          fmt.Println("hostname:", hostname)
+         
 	  config, err := rest.InClusterConfig()
 	  if err != nil {
 		panic(err.Error())
@@ -44,43 +51,6 @@ func createConfig() error{
                     metav1.ListOptions{LabelSelector: "node-role.kubernetes.io/master=",})
           if err != nil {
             return err
-          }
-          var masterNodes []string
-          for _, element := range nodeList.Items {
-                  masterNodes = append(masterNodes, element.Name)
-          }
-
-          kubeadmConfigMapClient := clientset.CoreV1().ConfigMaps("kube-system")
-          kcm, err := kubeadmConfigMapClient.Get("kubeadm-config", metav1.GetOptions{})
-          clusterConfig := kcm.Data["ClusterConfiguration"]
-          clusterConfigByte := []byte(clusterConfig)
-          clusterConfigMap := make(map[interface{}]interface{})
-          err = yaml.Unmarshal(clusterConfigByte, &clusterConfigMap)
-          if err != nil {
-            return err
-          }
-          controlPlaneEndpoint := clusterConfigMap["controlPlaneEndpoint"].(string)
-          controlPlaneEndpointHost, controlPlaneEndpointPort, _ := net.SplitHostPort(controlPlaneEndpoint)
-          clusterName := clusterConfigMap["clusterName"].(string)
-
-          networkConfig := make(map[interface{}]interface{})
-          networkConfig = clusterConfigMap["networking"].(map[interface{}]interface{})
-          podSubnet := networkConfig["podSubnet"].(string)
-          serviceSubnet := networkConfig["serviceSubnet"].(string)
-
-          configMap := &v1.ConfigMap{
-              ObjectMeta: metav1.ObjectMeta{
-                  Name: "contrailcontrollernodes",
-                  Namespace: "contrail",
-              },
-              Data: map[string]string{
-                  "CONTROLLER_NODES": strings.Join(masterNodes,","),
-                  "KUBERNETES_API_SERVER": controlPlaneEndpointHost,
-                  "KUBERNETES_API_SECURE_PORT": controlPlaneEndpointPort,
-                  "KUBERNETES_POD_SUBNETS": podSubnet,
-                  "KUBERNETES_SERVICE_SUBNETS": serviceSubnet,
-                  "KUBERNETES_CLUSTER_NAME": clusterName,
-              },
           }
 
           configMapClient := clientset.CoreV1().ConfigMaps("contrail")
